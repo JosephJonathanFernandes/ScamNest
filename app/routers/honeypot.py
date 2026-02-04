@@ -13,7 +13,8 @@ from ..models.schemas import (
     SessionState,
 )
 from ..services.session_service import SessionService
-from ..services.scam_detector import ScamDetector
+from ..services.scam_detector import ScamDetector as RuleScamDetector
+from ..services.model_predictor import ScamDetector as MLScamDetector
 from ..services.intelligence_extractor import IntelligenceExtractor
 from ..services.agent_service import AgentService
 from ..services.callback_service import CallbackService
@@ -25,7 +26,8 @@ router = APIRouter(tags=["Honeypot"])
 
 # Initialize services
 session_service = SessionService()
-scam_detector = ScamDetector()
+rule_scam_detector = RuleScamDetector()
+ml_scam_detector = MLScamDetector()
 intelligence_extractor = IntelligenceExtractor()
 agent_service = AgentService()
 callback_service = CallbackService()
@@ -41,12 +43,12 @@ async def process_callback(session: SessionState, agent_notes: str):
         logger.error(f"Callback failed for session {session.sessionId}: {error}")
 
 
-@router.post("/honeypot", response_model=MessageResponse)
+@router.post("/honeypot")
 async def handle_message(
     request: MessageRequest,
     background_tasks: BackgroundTasks,
     api_key: str = Depends(verify_api_key),
-) -> MessageResponse:
+):
     """
     Handle incoming scam message and return agent response.
     
@@ -69,14 +71,29 @@ async def handle_message(
     """
     logger.info(f"Received message for session {request.sessionId}")
     
-    # Step 1: Get or create session
-    session = session_service.get_or_create_session(
-        request.sessionId,
-        request.metadata
-    )
-    
-    # Step 2: Add incoming message to session
-    session = session_service.add_message(request.sessionId, request.message)
+    # Preliminary intent detection using HF endpoint (only for scammer messages)
+    if request.message.sender.lower() == "scammer":
+        ml_result = ml_scam_detector.is_possible_scam(request.message.text)
+        label = ml_result.get("label", "not_scam")
+        confidence = float(ml_result.get("confidence", 0.0))
+        logger.info("ML scam detector output for session %s: %s", request.sessionId, ml_result)
+
+        if label != "possible_scam":
+            # Ignore non-scam messages early
+            return {"status": "ignored", "reason": "not a scam"}
+
+        # Create/get session and persist preliminary intent
+        session = session_service.get_or_create_session(request.sessionId, request.metadata)
+        session = session_service.add_message(request.sessionId, request.message)
+        session.preliminaryIntent = "possible_scam"
+        session.preliminaryConfidence = confidence
+        session.llmEngaged = True
+        session = session_service.update_session(session)
+        logger.info(f"Preliminary intent: {session.preliminaryIntent} (conf={confidence:.2f})")
+    else:
+        # Non-scammer messages: proceed normally
+        session = session_service.get_or_create_session(request.sessionId, request.metadata)
+        session = session_service.add_message(request.sessionId, request.message)
     
     # Add conversation history if provided (for first message reconstruction)
     if request.conversationHistory and session.totalMessages == 1:
@@ -87,7 +104,7 @@ async def handle_message(
         session = session_service.update_session(session)
     
     # Step 3: Analyze for scam patterns
-    confidence, suspected, confirmed, keywords = scam_detector.analyze_session(session)
+    confidence, suspected, confirmed, keywords = rule_scam_detector.analyze_session(session)
     session = session_service.update_scam_status(
         request.sessionId,
         suspected=suspected,
@@ -108,8 +125,12 @@ async def handle_message(
         session = session_service.update_intelligence(request.sessionId, intelligence)
         logger.info(f"Extracted intelligence: {intelligence.model_dump()}")
     
-    # Step 5: Generate agent response
-    reply = agent_service.generate_response(session, request.message)
+    # Step 5: Generate agent response (only engage LLM when predictor flagged possible scam)
+    reply = agent_service.generate_response_conditional(
+        session,
+        request.message,
+        engage_llm=bool(session.llmEngaged),
+    )
     
     # Add agent response to session
     agent_message = Message(
@@ -122,7 +143,7 @@ async def handle_message(
     # Step 6: Check if callback should be sent
     if callback_service.should_send_callback(session):
         # Generate agent notes
-        scam_type = scam_detector.get_scam_type(
+        scam_type = rule_scam_detector.get_scam_type(
             session.extractedIntelligence.suspiciousKeywords
         )
         agent_notes = intelligence_extractor.generate_agent_notes(session, scam_type)
@@ -131,10 +152,10 @@ async def handle_message(
         background_tasks.add_task(process_callback, session, agent_notes)
         logger.info(f"Callback scheduled for session {request.sessionId}")
     
-    return MessageResponse(
-        status="success",
-        reply=reply,
-    )
+    return {
+        "status": "success",
+        "reply": reply,
+    }
 
 
 @router.get("/session/{session_id}")

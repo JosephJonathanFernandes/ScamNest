@@ -10,7 +10,7 @@ from typing import Optional
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    api_key: str = "your-secret-api-key"
+    api_key: str = "ABC-123"
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
     guvi_callback_url: str = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
