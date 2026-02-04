@@ -11,3 +11,7 @@ requests
 transformers
 sentencepiece
 torch
+pandas
+scikit-learn
+langdetect
+pytest
