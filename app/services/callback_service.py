@@ -40,6 +40,50 @@ class CallbackService:
             agentNotes=agent_notes or session.agentNotes,
         )
     
+    def _print_payload_summary(self, payload: CallbackPayload):
+        """Print extracted intelligence and callback payload to console."""
+        import json
+        
+        print("\n" + "="*80)
+        print("EXTRACTED INTELLIGENCE & CALLBACK PAYLOAD".center(80))
+        print("="*80 + "\n")
+        
+        intel = payload.extractedIntelligence
+        
+        print(f"Session ID: {payload.sessionId}")
+        print(f"Scam Detected: {payload.scamDetected}")
+        print(f"Total Messages Exchanged: {payload.totalMessagesExchanged}")
+        print()
+        
+        print("EXTRACTED INTELLIGENCE:")
+        print(f"  • UPI IDs ({len(intel['upiIds'])}):")
+        for upi in intel['upiIds']:
+            print(f"      {upi}")
+        
+        print(f"  • Bank Accounts ({len(intel['bankAccounts'])}):")
+        for acc in intel['bankAccounts']:
+            print(f"      {acc}")
+        
+        print(f"  • Phishing Links ({len(intel['phishingLinks'])}):")
+        for link in intel['phishingLinks']:
+            print(f"      {link}")
+        
+        print(f"  • Phone Numbers ({len(intel['phoneNumbers'])}):")
+        for phone in intel['phoneNumbers']:
+            print(f"      {phone}")
+        
+        print(f"  • Suspicious Keywords ({len(intel['suspiciousKeywords'])}):")
+        if intel['suspiciousKeywords']:
+            print(f"      {', '.join(intel['suspiciousKeywords'])}")
+        
+        print(f"\nAgent Notes: {payload.agentNotes}")
+        
+        print("\nFULL CALLBACK PAYLOAD:")
+        print(json.dumps(payload.model_dump(), indent=2))
+        
+        print("\nCallback Destination: https://hackathon.guvi.in/api/updateHoneyPotFinalResult")
+        print("="*80 + "\n")
+    
     async def send_callback(
         self, 
         session: SessionState, 
@@ -63,6 +107,9 @@ class CallbackService:
         
         # Build payload
         payload = self._build_payload(session, agent_notes)
+        
+        # Print intelligence extraction summary and payload to console
+        self._print_payload_summary(payload)
         
         logger.info(f"Sending callback for session {session.sessionId}")
         logger.debug(f"Callback payload: {payload.model_dump_json()}")
@@ -101,11 +148,16 @@ class CallbackService:
         """
         Determine if callback should be sent for this session.
         
-        Conditions:
-        1. Scam must be confirmed (scamDetected = True)
-        2. Callback not already sent
-        3. Minimum messages exchanged
-        4. Some intelligence extracted (optional but recommended)
+          Strategy: Require minimum intelligence and minimum conversation length,
+          with safety caps to prevent long conversations.
+        
+          Conditions:
+          1. Scam must be confirmed (scamDetected = True)
+          2. Callback not already sent
+          3. EITHER:
+              a) Minimum 3 valuable artifacts AND minimum 5 messages
+              b) Minimum 2 valuable artifacts AND minimum 12 messages
+              c) Safety cap at 30 messages
         """
         if session.callbackSent:
             return False
@@ -113,14 +165,40 @@ class CallbackService:
         if not session.scamDetected:
             return False
         
-        if session.totalMessages < self.settings.min_messages_for_callback:
-            return False
+        intel = session.extractedIntelligence
         
-        # Additional check: prefer having some intelligence
-        # but not strictly required
-        if session.extractedIntelligence.is_empty():
-            # Still allow callback but with lower confidence
-            if session.scamConfidenceScore < 0.8:
-                return False
+        # Count valuable artifacts (not just keywords)
+        valuable_artifacts = (
+            len(intel.upiIds) + 
+            len(intel.bankAccounts) + 
+            len(intel.phishingLinks) + 
+            len(intel.phoneNumbers)
+        )
         
-        return True
+        # Safety cap: stop after 30 messages
+        if session.totalMessages >= 30:
+            logger.info(
+                "Callback condition met: safety cap at %s messages",
+                session.totalMessages,
+            )
+            return True
+
+        # Gate A: minimum artifacts + minimum messages
+        if valuable_artifacts >= 3 and session.totalMessages >= 5:
+            logger.info(
+                "Callback condition met: %s artifacts and %s messages",
+                valuable_artifacts,
+                session.totalMessages,
+            )
+            return True
+
+        # Gate B: fewer artifacts but longer conversation
+        if valuable_artifacts >= 2 and session.totalMessages >= 12:
+            logger.info(
+                "Callback condition met: %s artifacts and %s messages",
+                valuable_artifacts,
+                session.totalMessages,
+            )
+            return True
+        
+        return False
