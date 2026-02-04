@@ -222,9 +222,10 @@ class ScamDetector:
         diversity_bonus = min(len(set(all_keywords)) * 0.02, 0.2)
         final_score = min(avg_score + diversity_bonus, 1.0)
 
-        # Determine status
+        # Determine status (use averaged session confidence)
+        # Suspected if >= 0.3, confirmed if >= 0.51 with at least 2 scammer messages
         is_suspected = bool(final_score >= 0.3)
-        is_confirmed = bool(final_score >= 0.6 and message_count >= 2)
+        is_confirmed = bool(final_score >= 0.51 and message_count >= 2)
 
         return final_score, is_suspected, is_confirmed, list(set(all_keywords))
 

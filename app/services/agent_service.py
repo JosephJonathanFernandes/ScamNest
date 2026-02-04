@@ -198,6 +198,27 @@ Remember: You're gathering information about the scammer while appearing to be a
         
         # Fall back to template responses
         return self._select_template_response(session, current_message)
+
+    def generate_response_conditional(
+        self,
+        session: SessionState,
+        current_message: Message,
+        engage_llm: bool,
+    ) -> str:
+        """Generate a response only using the LLM when `engage_llm` is True.
+
+        If `engage_llm` is False, this will always use the template selector
+        and will not call the OpenAI API.
+        """
+        if engage_llm:
+            ai_response = self._get_ai_response(session, current_message)
+            if ai_response:
+                print("LOGS_DATA : OPENAI response generated and it is {"+ ai_response +"}")
+                return ai_response
+            return self._select_template_response(session, current_message)
+
+        # Do not call LLM; use template response only
+        return self._select_template_response(session, current_message)
     
     def should_continue_engagement(self, session: SessionState) -> bool:
         """

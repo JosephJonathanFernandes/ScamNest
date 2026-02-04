@@ -101,6 +101,9 @@ class SessionState(BaseModel):
     metadata: Optional[Metadata] = None
     createdAt: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updatedAt: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    preliminaryIntent: Optional[str] = None
+    preliminaryConfidence: float = 0.0
+    llmEngaged: bool = False
 
 
 class CallbackPayload(BaseModel):
