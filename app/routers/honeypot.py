@@ -101,7 +101,7 @@ async def handle_message(
         ml_result = ml_scam_detector.is_possible_scam(request.message.text)
         label = ml_result.get("label", "not_scam")
         confidence = float(ml_result.get("confidence", 0.0))
-        logger.info("ML scam detector output for session %s: %s", request.sessionId, ml_result)
+        logger.info("preliminary scam detector output for session %s: %s", request.sessionId, ml_result)
 
         if label != "possible_scam":
             # Ignore non-scam messages early
@@ -113,17 +113,6 @@ async def handle_message(
         session.llmEngaged = True
         session = session_service.update_session(session)
         logger.info(f"Preliminary intent: {session.preliminaryIntent} (conf={confidence:.2f})")
-
-    # Step 3: Translate and analyze for scam patterns
-    if request.message.sender.lower() == "scammer":
-        try:
-            translated_text = Translate_service.translate(request.message.text)
-            request.message.text = translated_text
-            # Update the message in session history so detector sees English
-            session.messages[-1].text = translated_text
-            logger.info(f"Translated message to English for detection: {translated_text}")
-        except Exception as e:
-            logger.error(f"Translation failed: {e}")
 
     confidence, suspected, confirmed, keywords = rule_and_model_scam_detector.analyze_session(session)
     session = session_service.update_scam_status(
