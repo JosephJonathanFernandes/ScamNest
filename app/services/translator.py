@@ -30,13 +30,12 @@ class Translator:
             raise e
 
 translator = Translator()
-# print(translator.translate("some text"))
-print(translator.translate("""
-तुमच्या बँक खात्यात संशयास्पद हालचाल आढळून आली आहे.
-कृपया तात्काळ खालील लिंकवर क्लिक करून तुमची माहिती पडताळून पहा.
 
+# Test code - uncomment to test translation
+# print(translator.translate("some text"))
+# print(translator.translate("""
+# तुमच्या बँक खात्यात संशयास्पद हालचाल आढळून आली आहे.
+# कृपया तात्काळ खालील लिंकवर क्लिक करून तुमची माहिती पडताळून पहा.
 # """))
-# # print("end")
-# print("end")
 # import sys
 # sys.exit(0)
