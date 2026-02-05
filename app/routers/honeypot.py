@@ -120,27 +120,12 @@ async def handle_message(
         confidence = float(ml_result.get("confidence", 0.0))
         logger.info("preliminary scam detector output for session %s: %s", request.sessionId, ml_result)
 
-        if label != "possible_scam":
-            # Return success with "not a scam" reply
-            return {"status": "success", "reply": "not a scam"}
-
         # Persist preliminary intent and mark LLM engagement
         session.preliminaryIntent = "possible_scam"
         session.preliminaryConfidence = confidence
         session.llmEngaged = True
         session = session_service.update_session(session)
         logger.info(f"Preliminary intent: {session.preliminaryIntent} (conf={confidence:.2f})")
-
-    # Step 3: Translate and analyze for scam patterns using confidence-aware detection
-    if request.message.sender.lower() == "scammer":
-        try:
-            translated_text = Translate_service.translate(request.message.text)
-            request.message.text = translated_text
-            # Update the message in session history so detector sees English
-            session.messages[-1].text = translated_text
-            logger.info(f"Translated message to English for detection: {translated_text}")
-        except Exception as e:
-            logger.error(f"Translation failed: {e}")
 
     # Use new confidence-aware risk aggregation
     ml_prediction = {
@@ -312,19 +297,18 @@ async def handle_message(
         logger.info(f"Extracted intelligence: {masked_intel}")
 
     # Step 5: Generate agent response based on risk level
-    # Determine engagement strategy based on risk assessment
-    should_engage = risk_aggregator.should_engage(risk_level, aggregated_score)
-    engagement_strategy = risk_aggregator.get_engagement_strategy(risk_level, aggregated_score)
+    # For hackathon: Always engage if scam suspected or detected to maximize intelligence extraction
+    should_engage = session.scamSuspected or session.scamDetected
 
     logger.info(
         f"Engagement decision: should_engage={should_engage}, "
-        f"strategy={engagement_strategy}"
+        f"scamSuspected={session.scamSuspected}, scamDetected={session.scamDetected}"
     )
 
     reply = agent_service.generate_response_conditional(
         session,
         request.message,
-        engage_llm=bool(session.llmEngaged and should_engage),
+        engage_llm=bool(should_engage),
     )
 
     # Add agent response to session
