@@ -64,7 +64,7 @@ Message -> Detect Scam -> Extract Intel -> Generate Reply -> Callback to GUVI (i
 
 ## TODO
 
-`app/services/scam_detector.py` uses **hardcoded regex patterns**. Replace with ML model.
+`app/services/scam_detector.py`
 
 ## Structure
 
