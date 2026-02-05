@@ -148,16 +148,18 @@ class CallbackService:
         """
         Determine if callback should be sent for this session.
         
-          Strategy: Require minimum intelligence and minimum conversation length,
-          with safety caps to prevent long conversations.
+        Strategy: Multiple escalating gates based on artifact count and message count.
         
-          Conditions:
-          1. Scam must be confirmed (scamDetected = True)
-          2. Callback not already sent
-          3. EITHER:
-              a) Minimum 3 valuable artifacts AND minimum 5 messages
-              b) Minimum 2 valuable artifacts AND minimum 12 messages
-              c) Safety cap at 30 messages
+        Conditions:
+        1. Scam must be confirmed (scamDetected = True)
+        2. Callback not already sent
+        3. EITHER:
+            a) Minimum 3 valuable artifacts AND minimum 8 messages
+            b) Minimum 2 valuable artifacts AND minimum 16 messages
+            c) Minimum 1 valuable artifact AND minimum 22 messages
+            d) Minimum 1 valuable artifact AND minimum 28 messages
+            e) Exit condition: 32+ messages
+            f) Safety net: ANY artifact + 10+ messages (ensures confirmed scams are reported)
         """
         if session.callbackSent:
             return False
@@ -175,27 +177,55 @@ class CallbackService:
             len(intel.phoneNumbers)
         )
         
-        # Safety cap: stop after 30 messages
-        if session.totalMessages >= 30:
+        # Exit condition: 32+ messages
+        if session.totalMessages >= 32:
             logger.info(
-                "Callback condition met: safety cap at %s messages",
+                "Callback condition met: exit condition at %s messages",
                 session.totalMessages,
             )
             return True
 
-        # Gate A: minimum artifacts + minimum messages
-        if valuable_artifacts >= 3 and session.totalMessages >= 5:
+        # Gate D: 1+ artifact + 28+ messages
+        if valuable_artifacts >= 1 and session.totalMessages >= 28:
             logger.info(
-                "Callback condition met: %s artifacts and %s messages",
+                "Callback condition met (Gate D): %s artifacts and %s messages",
                 valuable_artifacts,
                 session.totalMessages,
             )
             return True
 
-        # Gate B: fewer artifacts but longer conversation
-        if valuable_artifacts >= 2 and session.totalMessages >= 12:
+        # Gate C: 1+ artifact + 22+ messages
+        if valuable_artifacts >= 1 and session.totalMessages >= 22:
             logger.info(
-                "Callback condition met: %s artifacts and %s messages",
+                "Callback condition met (Gate C): %s artifacts and %s messages",
+                valuable_artifacts,
+                session.totalMessages,
+            )
+            return True
+
+        # Gate B: 2+ artifacts + 16+ messages
+        if valuable_artifacts >= 2 and session.totalMessages >= 16:
+            logger.info(
+                "Callback condition met (Gate B): %s artifacts and %s messages",
+                valuable_artifacts,
+                session.totalMessages,
+            )
+            return True
+
+        # Gate A: 3+ artifacts + 8+ messages
+        if valuable_artifacts >= 3 and session.totalMessages >= 8:
+            logger.info(
+                "Callback condition met (Gate A): %s artifacts and %s messages",
+                valuable_artifacts,
+                session.totalMessages,
+            )
+            return True
+        
+        # Safety net: If scam is confirmed and we have ANY artifact, send callback after 10 messages
+        # This ensures we don't lose confirmed scams just because scammer stopped responding
+        if valuable_artifacts >= 1 and session.totalMessages >= 10:
+            logger.info(
+                "Callback condition met (Safety net): %s artifacts and %s messages (scam confirmed)",
                 valuable_artifacts,
                 session.totalMessages,
             )
