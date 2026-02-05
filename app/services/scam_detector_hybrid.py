@@ -11,7 +11,7 @@ class ScamDetector:
     """
     Detects scam patterns in messages using rule-based and AI analysis.
     """
-    
+
     # Suspicious keyword patterns
     URGENCY_PATTERNS = [
         r'\burgent\b',
@@ -68,6 +68,11 @@ class ScamDetector:
         r'\baadhaar\b',
         r'\bpan\b',
         r'\bkyc\b',
+        r'\bupi\s+(?:id|pin|password)\b',
+        r'\bm-pin\b',
+        r'\bt-pin\b',
+        r'\batm\s+pin\b',
+        r'\bvirtual\s+payment\b',
         # These are mostly nouns → no natural past tense forms to add
     ]
 
@@ -105,6 +110,35 @@ class ScamDetector:
         r'\breward\b',
         r'\bbonus\b',
         r'\bamount\b',  # sometimes scammers say "amount"
+        r'\brefund\b',
+        r'\btransaction\b',
+        r'\bpayment\b',
+    ]
+
+    # India-specific UPI scam patterns (high-risk combinations)
+    UPI_SCAM_PATTERNS = [
+        r'(?:share|send|provide|give).*upi',
+        r'upi.*(?:blocked|suspended|deactivated|frozen)',
+        r'(?:verify|update|confirm|reactivate).*upi',
+        r'upi.*(?:expire|expiring|invalid)',
+        r'link.*(?:bank|account).*upi',
+        r'upi.*mandate',
+        r'auto.*debit.*upi',
+        r'collect.*request',
+        r'accept.*payment.*request',
+    ]
+
+    # Financial coercion patterns (threats related to money/accounts)
+    FINANCIAL_COERCION_PATTERNS = [
+        r'account.*(?:blocked|suspended|frozen|closed)',
+        r'(?:block|suspend|freeze|close).*account',
+        r'card.*(?:blocked|suspended|deactivated)',
+        r'(?:block|suspend|deactivate).*card',
+        r'(?:prevent|avoid|stop).*(?:blocking|suspension|closure)',
+        r'update.*kyc.*(?:immediately|today|now)',
+        r'kyc.*(?:pending|incomplete|failed)',
+        r'(?:verify|confirm).*identity.*(?:urgent|immediate)',
+        r'last.*(?:chance|warning).*(?:account|card|kyc)',
     ]
 
     def __init__(self):
@@ -121,6 +155,8 @@ class ScamDetector:
         self.sensitive_re = [re.compile(p, re.IGNORECASE) for p in self.SENSITIVE_DATA_PATTERNS]
         self.impersonation_re = [re.compile(p, re.IGNORECASE) for p in self.IMPERSONATION_PATTERNS]
         self.money_re = [re.compile(p, re.IGNORECASE) for p in self.MONEY_PATTERNS]
+        self.upi_scam_re = [re.compile(p, re.IGNORECASE) for p in self.UPI_SCAM_PATTERNS]
+        self.financial_coercion_re = [re.compile(p, re.IGNORECASE) for p in self.FINANCIAL_COERCION_PATTERNS]
 
     def _count_pattern_matches(self, text: str, patterns: List[re.Pattern]) -> int:
         """Count number of pattern matches in text."""
@@ -179,6 +215,18 @@ class ScamDetector:
         if money_count > 0:
             rule_score += min(money_count * 0.05, 0.10)
             keywords.extend(self._extract_matched_keywords(text, self.money_re))
+
+        # Check UPI scam patterns (weight: 0.20) - India-specific high-risk
+        upi_scam_count = self._count_pattern_matches(text, self.upi_scam_re)
+        if upi_scam_count > 0:
+            rule_score += min(upi_scam_count * 0.10, 0.20)
+            keywords.extend(self._extract_matched_keywords(text, self.upi_scam_re))
+
+        # Check financial coercion patterns (weight: 0.20) - high-risk threats
+        financial_coercion_count = self._count_pattern_matches(text, self.financial_coercion_re)
+        if financial_coercion_count > 0:
+            rule_score += min(financial_coercion_count * 0.10, 0.20)
+            keywords.extend(self._extract_matched_keywords(text, self.financial_coercion_re))
 
         # 2. ML-based detection
         ml_score = 0.0

@@ -22,6 +22,20 @@ class ChannelType(str, Enum):
     CHAT = "Chat"
 
 
+class RiskLevel(str, Enum):
+    """Enum for risk assessment levels."""
+    SAFE = "safe"
+    SUSPICIOUS = "suspicious"
+    SCAM = "scam"
+
+
+class ConfidenceLevel(str, Enum):
+    """Enum for ML confidence levels."""
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 class Message(BaseModel):
     """Schema for a single message."""
     sender: str = Field(..., description="Either 'scammer' or 'user'")
@@ -41,7 +55,7 @@ class MessageRequest(BaseModel):
     sessionId: str = Field(..., description="Unique identifier for a conversation")
     message: Message = Field(..., description="Latest incoming message")
     conversationHistory: Optional[List[Message]] = Field(
-        default=[], 
+        default=[],
         description="Previous messages in this session"
     )
     metadata: Optional[Metadata] = Field(
@@ -63,7 +77,7 @@ class ExtractedIntelligence(BaseModel):
     phishingLinks: List[str] = Field(default_factory=list)
     phoneNumbers: List[str] = Field(default_factory=list)
     suspiciousKeywords: List[str] = Field(default_factory=list)
-    
+
     def merge(self, other: "ExtractedIntelligence") -> "ExtractedIntelligence":
         """Merge intelligence from another extraction."""
         return ExtractedIntelligence(
@@ -73,7 +87,7 @@ class ExtractedIntelligence(BaseModel):
             phoneNumbers=list(set(self.phoneNumbers + other.phoneNumbers)),
             suspiciousKeywords=list(set(self.suspiciousKeywords + other.suspiciousKeywords)),
         )
-    
+
     def is_empty(self) -> bool:
         """Check if no intelligence has been extracted."""
         return not any([
@@ -104,6 +118,13 @@ class SessionState(BaseModel):
     preliminaryIntent: Optional[str] = None
     preliminaryConfidence: float = 0.0
     llmEngaged: bool = False
+
+    # Enhanced fields for confidence-aware detection
+    riskLevel: Optional[str] = Field(default="safe", description="Risk level: safe, suspicious, or scam")
+    mlConfidenceLevel: Optional[str] = Field(default=None, description="ML confidence: high, medium, or low")
+    decisionExplanation: Optional[dict] = Field(default=None, description="Detailed decision breakdown")
+    intentScore: Optional[float] = Field(default=0.0, description="Intent-based risk score")
+    ruleScore: Optional[float] = Field(default=0.0, description="Rule-based risk score")
 
 
 class CallbackPayload(BaseModel):
