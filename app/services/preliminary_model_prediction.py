@@ -22,7 +22,7 @@ except Exception:
 
 import numpy as np
 from ..models.schemas import Message
-from .scam_detector_hybrid import ScamDetector as RuleScamDetector
+from .scam_detector_hybrid import ScamDetector as RuleAndModelScamDetector
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +259,8 @@ class ScamDetector:
         if not self.ready:
             # Fallback to rule-based detector when local artifacts are missing
             try:
-                rule = RuleScamDetector()
+                logger.info("Preliminary Model is not available")
+                rule = RuleAndModelScamDetector()
                 msg = Message(sender="scammer", text=message, timestamp="")
                 score, _ = rule.analyze_message(msg)
                 label = "possible_scam" if score >= 0.3 else "not_scam"
@@ -289,7 +290,7 @@ class ScamDetector:
                 except Exception:
                     # If local prediction fails, fallback to rule-based detector
                     try:
-                        rule = RuleScamDetector()
+                        rule = RuleAndModelScamDetector()
                         msg = Message(sender="scammer", text=message, timestamp="")
                         score, _ = rule.analyze_message(msg)
                         label = "possible_scam" if score >= 0.3 else "not_scam"
@@ -306,7 +307,7 @@ class ScamDetector:
         except Exception:
             logger.exception("Error during ML scam prediction, falling back to HF")
             try:
-                rule = RuleScamDetector()
+                rule = RuleAndModelScamDetector()
                 msg = Message(sender="scammer", text=message, timestamp="")
                 score, _ = rule.analyze_message(msg)
                 label = "possible_scam" if score >= 0.3 else "not_scam"
