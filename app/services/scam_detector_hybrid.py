@@ -13,6 +13,103 @@ class ScamDetector:
     """
     
     # Suspicious keyword patterns
+    # URGENCY_PATTERNS = [
+    #     r'\burgent\b',
+    #     r'\bimmediately\b',
+    #     r'\btoday\b',
+    #     r'\bnow\b',
+    #     r'\basap\b',
+    #     r'\bquick\b',
+    #     r'\bfast\b',
+    #     r'\bhurry\b',
+    #     r'\blast\s+chance\b',
+    #     r'\blimited\s+time\b',
+    #     r'\bexpir(?:e|ing|ed)\b',  # already good
+    # ]
+    #
+    # THREAT_PATTERNS = [
+    #     r'\bblock(?:ed)?\b',
+    #     r'\bsuspend(?:ed)?\b',
+    #     r'\bdeactivat(?:e|ed)\b',
+    #     r'\bfreez(?:e|ing)\b',
+    #     r'\bclose[ds]?\b',  # already good (d/s variation)
+    #     r'\blegal\s+action\b',
+    #     r'\barrest(?:ed)?\b',
+    #     r'\bpolice\b',
+    #     r'\bcourt\b',
+    #     r'\bpenalt(?:y|ies)\b',  # added plural variation
+    #     r'\bfin(?:e|ed)\b',  # can be "fine" or "fined"
+    #     r'\bwarrant(?:ed)?\b',
+    # ]
+    #
+    # REQUEST_PATTERNS = [
+    #     r'\bverif(?:y|ied)\b',  # verify / verified
+    #     r'\bconfirm(?:ed)?\b',
+    #     r'\bupdat(?:e|ed)\b',  # update / updated
+    #     r'\bprovid(?:e|ed)\b',  # provide / provided
+    #     r'\bshar(?:e|ed)\b',  # share / shared
+    #     r'\bsend(?:ing|(?:t|ed))\b',  # send / sending / sent
+    #     r'\btransfer(?:red)?\b',  # transfer / transferred
+    #     r'\bpa(?:y|id)\b',  # pay / paid
+    #     r'\bclick(?:ed)?\b',
+    #     r'\blink\b',
+    #     r'\benter(?:ed)?\b',
+    # ]
+    #
+    # SENSITIVE_DATA_PATTERNS = [
+    #     r'\botp\b',
+    #     r'\bpin\b',
+    #     r'\bpassword\b',
+    #     r'\bcvv\b',
+    #     r'\bcard\s+number\b',
+    #     r'\baccount\s+number\b',
+    #     r'\bbank\s+details\b',
+    #     r'\bupi\b',
+    #     r'\baadhaar\b',
+    #     r'\bpan\b',
+    #     r'\bkyc\b',
+    #     # These are mostly nouns → no natural past tense forms to add
+    # ]
+    #
+    # IMPERSONATION_PATTERNS = [
+    #     r'\bbank\b',
+    #     r'\brbi\b',
+    #     r'\bsbi\b',
+    #     r'\bhdfc\b',
+    #     r'\bicici\b',
+    #     r'\baxis\b',
+    #     r'\bpaytm\b',
+    #     r'\bgpay\b',
+    #     r'\bphonepe\b',
+    #     r'\bamazon\b',
+    #     r'\bflipkart\b',
+    #     r'\bcustomer\s+(?:care|service)\b',
+    #     r'\bgovernment\b',
+    #     r'\bofficial\b',
+    #     r'\bauthorized\b',
+    #     r'\bofficials?\b',  # minor addition
+    #     # Mostly proper nouns / adjectives → limited past-tense forms
+    # ]
+    #
+    # MONEY_PATTERNS = [
+    #     r'₹\s*\d+(?:\.\d+)?',  # improved: allow decimals
+    #     r'\brs\.?\s*\d+(?:\.\d+)?',
+    #     r'\brupees?\b',
+    #     r'\binr\b',
+    #     r'\blakh\b',
+    #     r'\bcrore\b',
+    #     r'\bprize\b',
+    #     r'\blotter(?:y|ies)\b',
+    #     r'\bwinner\b',
+    #     r'\bcashback\b',
+    #     r'\breward\b',
+    #     r'\bbonus\b',
+    #     r'\bamount\b',  # sometimes scammers say "amount"
+    # ]
+
+    # =========================
+    # URGENCY / TIME PRESSURE
+    # =========================
     URGENCY_PATTERNS = [
         r'\burgent\b',
         r'\bimmediately\b',
@@ -24,38 +121,74 @@ class ScamDetector:
         r'\bhurry\b',
         r'\blast\s+chance\b',
         r'\blimited\s+time\b',
-        r'\bexpir(?:e|ing|ed)\b',  # already good
+        r'\bexpir(?:e|ing|ed)\b',
+
+        # Added
+        r'\bwithin\s+\d+\s*(?:min|mins|minutes|hours|hrs)\b',
+        r'\btoday\s+itself\b',
+        r'\bimmediate\s+action\b',
+        r'\bact\s+now\b',
+        r'\bdeadline\b',
+        r'\bexpires?\s+(?:today|soon|shortly)\b',
+        r'\bno\s+delay\b',
     ]
 
+    # =========================
+    # THREAT / FEAR INDUCTION
+    # =========================
     THREAT_PATTERNS = [
         r'\bblock(?:ed)?\b',
         r'\bsuspend(?:ed)?\b',
         r'\bdeactivat(?:e|ed)\b',
         r'\bfreez(?:e|ing)\b',
-        r'\bclose[ds]?\b',  # already good (d/s variation)
+        r'\bclose[ds]?\b',
         r'\blegal\s+action\b',
         r'\barrest(?:ed)?\b',
         r'\bpolice\b',
         r'\bcourt\b',
-        r'\bpenalt(?:y|ies)\b',  # added plural variation
-        r'\bfin(?:e|ed)\b',  # can be "fine" or "fined"
+        r'\bpenalt(?:y|ies)\b',
+        r'\bfin(?:e|ed)\b',
         r'\bwarrant(?:ed)?\b',
+
+        # Added
+        r'\bservice\s+(?:will\s+be\s+)?(?:stopped|terminated|disabled)\b',
+        r'\baccess\s+(?:will\s+be\s+)?denied\b',
+        r'\baccount\s+(?:will\s+be\s+)?restricted\b',
+        r'\bpermanent\s+block\b',
+        r'\bblacklisted\b',
+        r'\bcomplaint\s+registered\b',
     ]
 
+    # =========================
+    # ACTION / REQUEST VERBS
+    # =========================
     REQUEST_PATTERNS = [
-        r'\bverif(?:y|ied)\b',  # verify / verified
+        r'\bverif(?:y|ied)\b',
         r'\bconfirm(?:ed)?\b',
-        r'\bupdat(?:e|ed)\b',  # update / updated
-        r'\bprovid(?:e|ed)\b',  # provide / provided
-        r'\bshar(?:e|ed)\b',  # share / shared
-        r'\bsend(?:ing|(?:t|ed))\b',  # send / sending / sent
-        r'\btransfer(?:red)?\b',  # transfer / transferred
-        r'\bpa(?:y|id)\b',  # pay / paid
+        r'\bupdat(?:e|ed)\b',
+        r'\bprovid(?:e|ed)\b',
+        r'\bshar(?:e|ed)\b',
+        r'\bsend(?:ing|(?:t|ed))\b',
+        r'\btransfer(?:red)?\b',
+        r'\bpa(?:y|id)\b',
         r'\bclick(?:ed)?\b',
         r'\blink\b',
         r'\benter(?:ed)?\b',
+
+        # Added
+        r'\bsubmit(?:ted)?\b',
+        r'\bre-?enter\b',
+        r'\bre-?verify\b',
+        r'\bupload(?:ed)?\b',
+        r'\bscan(?:ned)?\b',
+        r'\bforward(?:ed)?\b',
+        r'\bsend\s+back\b',
+        r'\bfill(?:ed)?\b',
     ]
 
+    # =========================
+    # SENSITIVE DATA (CRITICAL)
+    # =========================
     SENSITIVE_DATA_PATTERNS = [
         r'\botp\b',
         r'\bpin\b',
@@ -68,9 +201,23 @@ class ScamDetector:
         r'\baadhaar\b',
         r'\bpan\b',
         r'\bkyc\b',
-        # These are mostly nouns → no natural past tense forms to add
+
+        # Added
+        r'\bupi\s*id\b',
+        r'\bupi\s*pin\b',
+        r'\bdebit\s+card\b',
+        r'\bcredit\s+card\b',
+        r'\bexpiry\s+date\b',
+        r'\bdob\b',
+        r'\bdate\s+of\s+birth\b',
+        r'\blogin\s+details\b',
+        r'\bnet\s*banking\b',
+        r'\bmobile\s+number\b',
     ]
 
+    # =========================
+    # IMPERSONATION / AUTHORITY
+    # =========================
     IMPERSONATION_PATTERNS = [
         r'\bbank\b',
         r'\brbi\b',
@@ -87,12 +234,23 @@ class ScamDetector:
         r'\bgovernment\b',
         r'\bofficial\b',
         r'\bauthorized\b',
-        r'\bofficials?\b',  # minor addition
-        # Mostly proper nouns / adjectives → limited past-tense forms
+        r'\bofficials?\b',
+
+        # Added
+        r'\bupi\s+team\b',
+        r'\bpayment\s+team\b',
+        r'\bsecurity\s+team\b',
+        r'\bverification\s+team\b',
+        r'\btechnical\s+team\b',
+        r'\bfraud\s+department\b',
+        r'\bcompliance\s+team\b',
     ]
 
+    # =========================
+    # MONEY / TRANSACTION LURES
+    # =========================
     MONEY_PATTERNS = [
-        r'₹\s*\d+(?:\.\d+)?',  # improved: allow decimals
+        r'₹\s*\d+(?:\.\d+)?',
         r'\brs\.?\s*\d+(?:\.\d+)?',
         r'\brupees?\b',
         r'\binr\b',
@@ -104,7 +262,35 @@ class ScamDetector:
         r'\bcashback\b',
         r'\breward\b',
         r'\bbonus\b',
-        r'\bamount\b',  # sometimes scammers say "amount"
+        r'\bamount\b',
+
+        # Added
+        r'\bcharge(?:s|d)?\b',
+        r'\bfee(?:s)?\b',
+        r'\brefund(?:ed)?\b',
+        r'\bdeduct(?:ed|ion)?\b',
+        r'\bbalance\b',
+        r'\btransaction\b',
+        r'\bpayment\s+failed\b',
+    ]
+
+    # =========================
+    # HIGH-RISK COMPOSITE RULES
+    # (Override ML if matched)
+    # =========================
+    COMBO_HIGH_RISK_PATTERNS = [
+        r'share.*(otp|pin|upi)',
+        r'verify.*(account|upi|kyc)',
+        r'account.*(block|suspend|freeze)',
+        r'avoid.*(block|suspension)',
+    ]
+
+    # =========================
+    # OPTIONAL: LOCAL / MIXED LANGUAGE
+    # =========================
+    LOCAL_MIX_PATTERNS = [
+        r'upi.*(share|send|kodi|madi)',
+        r'account.*(block|stop|aag)',
     ]
 
     def __init__(self):
@@ -121,6 +307,8 @@ class ScamDetector:
         self.sensitive_re = [re.compile(p, re.IGNORECASE) for p in self.SENSITIVE_DATA_PATTERNS]
         self.impersonation_re = [re.compile(p, re.IGNORECASE) for p in self.IMPERSONATION_PATTERNS]
         self.money_re = [re.compile(p, re.IGNORECASE) for p in self.MONEY_PATTERNS]
+        self.combo_re = [re.compile(p, re.IGNORECASE) for p in self.COMBO_HIGH_RISK_PATTERNS]
+        self.local_mix_re = [re.compile(p, re.IGNORECASE) for p in self.LOCAL_MIX_PATTERNS]
 
     def _count_pattern_matches(self, text: str, patterns: List[re.Pattern]) -> int:
         """Count number of pattern matches in text."""
@@ -179,6 +367,16 @@ class ScamDetector:
         if money_count > 0:
             rule_score += min(money_count * 0.05, 0.10)
             keywords.extend(self._extract_matched_keywords(text, self.money_re))
+
+        combo_count = self._count_pattern_matches(text, self.combo_re)
+        if combo_count > 0:
+            rule_score += min(combo_count * 0.05, 0.10)
+            keywords.extend(self._extract_matched_keywords(text, self.combo_re))
+
+        local_count = self._count_pattern_matches(text, self.local_mix_re)
+        if local_count > 0:
+            rule_score += min(local_count * 0.05, 0.10)
+            keywords.extend(self._extract_matched_keywords(text, self.local_mix_re))
 
         # 2. ML-based detection
         ml_score = 0.0
